@@ -7,4 +7,5 @@ var (
 	ErrAlreadyListening = errors.New("Already listening.")
 	ErrInvalidPort      = errors.New("Invalid port.")
 	ErrNotListening     = errors.New("Not listening.")
+	ErrInvalidRootCA    = errors.New("Invalid root CA.")
 )
