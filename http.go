@@ -22,6 +22,13 @@ func NewHTTP(handler http.Handler) *HTTP {
 	return &HTTP{sync.RWMutex{}, handler, nil, 0, nil}
 }
 
+// IsRunning returns whether or not the server is accepting connections.
+func (self *HTTP) IsRunning() bool {
+	self.mutex.RLock()
+	defer self.mutex.RUnlock()
+	return self.listener != nil
+}
+
 // Start runs the HTTP server on a given port.
 func (self *HTTP) Start(port int) error {
 	if port < 0 || port > 65535 {
@@ -55,8 +62,18 @@ func (self *HTTP) Start(port int) error {
 		}
 		self.mutex.Unlock()
 	}()
+	
+	self.listenPort = port
 
 	return nil
+}
+
+// Status returns whether or not the server is running and the port on which it
+// is listening (if applicable).
+func (self *HTTP) Status() (bool, int) {
+	self.mutex.RLock()
+	defer self.mutex.RUnlock()
+	return self.listener != nil, self.listenPort
 }
 
 // Stop stops the HTTP server.
@@ -78,24 +95,22 @@ func (self *HTTP) Stop() error {
 	// Wait until the background thread's loop ends
 	<-self.loopDone
 	self.loopDone = nil
-
-	self.mutex.Unlock()
 	return nil
 }
 
 // Wait waits for the HTTP server to stop and then returns.
 func (self *HTTP) Wait() error {
-	self.mutex.Lock()
+	self.mutex.RLock()
 
 	// If not listening, return an error
 	if self.listener == nil {
-		self.mutex.Unlock()
+		self.mutex.RUnlock()
 		return ErrNotListening
 	}
 
 	// Get the channel and unlock the server
 	ch := self.loopDone
-	self.mutex.Unlock()
+	self.mutex.RUnlock()
 
 	// Wait for the background loop to end
 	<-ch
