@@ -24,12 +24,12 @@ func (c *TLSConfig) Clone() *TLSConfig {
 	for key, val := range c.Named {
 		named[key] = val
 	}
-	
+
 	roots := make([]string, len(c.RootCAs))
 	for i, x := range c.RootCAs {
 		roots[i] = x
 	}
-	
+
 	return &TLSConfig{named, roots, c.Default}
 }
 
@@ -37,9 +37,9 @@ func (c *TLSConfig) Clone() *TLSConfig {
 func (c *TLSConfig) ToConfig() (*tls.Config, error) {
 	var err error
 	res := &tls.Config{}
-	
+
 	res.NextProtos = []string{"http/1.1"}
-	
+
 	// Generate the default certificate
 	res.Certificates = make([]tls.Certificate, 1)
 	res.Certificates[0], err = tls.X509KeyPair([]byte(c.Default.Certificate),
@@ -47,7 +47,7 @@ func (c *TLSConfig) ToConfig() (*tls.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Generate named certificates
 	res.NameToCertificate = map[string]*tls.Certificate{}
 	for name, pair := range c.Named {
@@ -60,7 +60,7 @@ func (c *TLSConfig) ToConfig() (*tls.Config, error) {
 		res.Certificates = append(res.Certificates, loaded)
 		res.NameToCertificate[name] = &res.Certificates[idx]
 	}
-	
+
 	// Generate the RootCAs CertPool
 	if len(c.RootCAs) > 0 {
 		pool := x509.NewCertPool()
@@ -71,6 +71,6 @@ func (c *TLSConfig) ToConfig() (*tls.Config, error) {
 		}
 		res.RootCAs = pool
 	}
-	
+
 	return res, nil
 }

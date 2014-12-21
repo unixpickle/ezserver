@@ -50,19 +50,9 @@ func (self *HTTP) Start(port int) error {
 	self.listener = &listener
 
 	// Run the server in the background
-	doneChan := make(chan struct{})
-	self.loopDone = doneChan
-	go func() {
-		http.Serve(listener, self.handler)
-		close(doneChan)
-		self.mutex.Lock()
-		if self.listener == &listener {
-			self.listener = nil
-			self.loopDone = nil
-		}
-		self.mutex.Unlock()
-	}()
-	
+	self.loopDone = make(chan struct{})
+	go self.serverLoop(self.listener, self.loopDone)
+
 	self.listenPort = port
 
 	return nil
@@ -82,20 +72,7 @@ func (self *HTTP) Status() (bool, int) {
 func (self *HTTP) Stop() error {
 	self.mutex.Lock()
 	defer self.mutex.Unlock()
-
-	// If not listening, return an error
-	if self.listener == nil {
-		return ErrNotListening
-	}
-
-	// Close the listener and nil it out
-	(*self.listener).Close()
-	self.listener = nil
-
-	// Wait until the background thread's loop ends
-	<-self.loopDone
-	self.loopDone = nil
-	return nil
+	return self.stopInternal()
 }
 
 // Wait waits for the HTTP server to stop and then returns.
@@ -114,5 +91,32 @@ func (self *HTTP) Wait() error {
 
 	// Wait for the background loop to end
 	<-ch
+	return nil
+}
+
+func (self *HTTP) serverLoop(listener *net.Listener, doneChan chan<- struct{}) {
+	http.Serve(*listener, self.handler)
+	close(doneChan)
+	self.mutex.Lock()
+	if self.listener == listener {
+		self.listener = nil
+		self.loopDone = nil
+	}
+	self.mutex.Unlock()
+}
+
+func (self *HTTP) stopInternal() error {
+	// If not listening, return an error
+	if self.listener == nil {
+		return ErrNotListening
+	}
+
+	// Close the listener and nil it out
+	(*self.listener).Close()
+	self.listener = nil
+
+	// Wait until the background thread's loop ends
+	<-self.loopDone
+	self.loopDone = nil
 	return nil
 }
