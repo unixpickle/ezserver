@@ -51,7 +51,7 @@ func (self *HTTP) Start(port int) error {
 
 	// Run the server in the background
 	self.loopDone = make(chan struct{})
-	go self.serverLoop(self.listener, self.loopDone)
+	go self.serverLoop(self.listener, self.loopDone, "http")
 
 	self.listenPort = port
 
@@ -94,8 +94,13 @@ func (self *HTTP) Wait() error {
 	return nil
 }
 
-func (self *HTTP) serverLoop(listener *net.Listener, doneChan chan<- struct{}) {
-	http.Serve(*listener, self.handler)
+func (self *HTTP) serverLoop(listener *net.Listener, doneChan chan<- struct{},
+	scheme string) {
+	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.URL.Scheme = scheme
+		self.handler.ServeHTTP(w, r)
+	})
+	http.Serve(*listener, h)
 	close(doneChan)
 	self.mutex.Lock()
 	if self.listener == listener {

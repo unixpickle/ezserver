@@ -70,7 +70,7 @@ func (self *HTTPS) startInternal(port int) error {
 
 	// Run the server in the background
 	self.loopDone = make(chan struct{})
-	go self.serverLoop(self.listener, self.loopDone)
+	go self.serverLoop(self.listener, self.loopDone, "https")
 
 	self.listenPort = port
 
