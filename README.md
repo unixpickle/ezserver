@@ -11,7 +11,7 @@ Checkout the [demo](demo) folder for some samples.
 **ezserver** is licensed under the BSD 2-clause license. See [LICENSE](LICENSE).
 
 ```
-Copyright (c) 2014, Alex Nichol.
+Copyright (c) 2014-2015, Alex Nichol.
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
