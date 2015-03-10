@@ -19,13 +19,6 @@ func NewHTTPS(handler http.Handler, config *TLSConfig) *HTTPS {
 	return &HTTPS{NewHTTP(handler), config.Clone()}
 }
 
-// GetTLSConfig returns the TLSConfig for the server.
-func (self *HTTPS) GetTLSConfig() *TLSConfig {
-	self.mutex.RLock()
-	defer self.mutex.RUnlock()
-	return self.config.Clone()
-}
-
 // SetTLSConfig sets the TLSConfig on the server.
 // This may stop and restart the server.
 func (self *HTTPS) SetTLSConfig(c *TLSConfig) error {
@@ -46,6 +39,13 @@ func (self *HTTPS) Start(port int) error {
 	self.mutex.Lock()
 	defer self.mutex.Unlock()
 	return self.startInternal(port)
+}
+
+// TLSConfig returns the TLSConfig for the server.
+func (self *HTTPS) TLSConfig() *TLSConfig {
+	self.mutex.RLock()
+	defer self.mutex.RUnlock()
+	return self.config.Clone()
 }
 
 func (self *HTTPS) startInternal(port int) error {
