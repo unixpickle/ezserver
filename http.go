@@ -31,7 +31,7 @@ func (self *HTTP) IsRunning() bool {
 
 // Start runs the HTTP server on a given port.
 func (self *HTTP) Start(port int) error {
-	if port < 0 || port > 65535 {
+	if port <= 0 || port > 65535 {
 		return ErrInvalidPort
 	}
 

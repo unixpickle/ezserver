@@ -49,7 +49,7 @@ func (self *HTTPS) TLSConfig() *TLSConfig {
 }
 
 func (self *HTTPS) startInternal(port int) error {
-	if port < 0 || port > 65535 {
+	if port <= 0 || port > 65535 {
 		return ErrInvalidPort
 	} else if self.listener != nil {
 		return ErrAlreadyListening
