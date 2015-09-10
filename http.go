@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+  "time"
 )
 
 // HTTP is an HTTP server instance which can listen on one port at a time.
@@ -100,7 +101,12 @@ func (self *HTTP) serverLoop(listener *net.Listener, doneChan chan<- struct{},
 		r.URL.Scheme = scheme
 		self.handler.ServeHTTP(w, r)
 	})
-	http.Serve(*listener, h)
+
+  var server http.Server
+  server.Handler = h
+  server.ReadTimeout = time.Hour
+	server.Serve(*listener)
+
 	close(doneChan)
 	self.mutex.Lock()
 	if self.listener == listener {
