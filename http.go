@@ -15,12 +15,15 @@ type HTTP struct {
 	listener   *net.Listener
 	listenPort int
 	loopDone   chan struct{}
+
+	redirectsLock sync.RWMutex
+	redirects     []string
 }
 
 // NewHTTP creates a new HTTP server with a given handler.
 // The server will not be started.
 func NewHTTP(handler http.Handler) *HTTP {
-	return &HTTP{sync.RWMutex{}, handler, nil, 0, nil}
+	return &HTTP{sync.RWMutex{}, handler, nil, 0, nil, sync.RWMutex{}, nil}
 }
 
 // IsRunning returns whether or not the server is accepting connections.
@@ -28,6 +31,37 @@ func (self *HTTP) IsRunning() bool {
 	self.mutex.RLock()
 	defer self.mutex.RUnlock()
 	return self.listener != nil
+}
+
+// SecurityRedirects returns the list of hosts that are
+// redirected to use a different amount of security.
+// For HTTP servers, redirects go to HTTPS.
+// For HTTPS servers, redirects go to HTTP.
+//
+// The returned slice is a copy of the original, so the
+// caller may modify it without changing the redirects
+// used by the server.
+func (self *HTTP) SecurityRedirects() []string {
+	self.redirectsLock.RLock()
+	defer self.redirectsLock.RUnlock()
+	res := make([]string, len(self.redirects))
+	copy(res, self.redirects)
+	return res
+}
+
+// SetSecurityRedirects sets the list of hosts that are
+// redirected to use a different amount of security.
+//
+// The slice is copied before being adopted by the server,
+// so the caller may modify it without changing the
+// redirects used by the server.
+//
+// See SecurityRedirects for more.
+func (self *HTTP) SetSecurityRedirects(r []string) {
+	self.redirectsLock.Lock()
+	defer self.redirectsLock.Unlock()
+	self.redirects = make([]string, len(r))
+	copy(self.redirects, r)
 }
 
 // Start runs the HTTP server on a given port.
@@ -98,6 +132,16 @@ func (self *HTTP) Wait() error {
 func (self *HTTP) serverLoop(listener *net.Listener, doneChan chan<- struct{},
 	scheme string) {
 	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if self.shouldRedirect(r.Host) {
+			newURL := *r.URL
+			if scheme == "http" {
+				newURL.Scheme = "https"
+			} else {
+				newURL.Scheme = "http"
+			}
+			http.Redirect(w, r, newURL.String(), http.StatusTemporaryRedirect)
+			return
+		}
 		r.URL.Scheme = scheme
 		self.handler.ServeHTTP(w, r)
 	})
@@ -130,4 +174,15 @@ func (self *HTTP) stopInternal() error {
 	<-self.loopDone
 	self.loopDone = nil
 	return nil
+}
+
+func (self *HTTP) shouldRedirect(host string) bool {
+	self.redirectsLock.RLock()
+	defer self.redirectsLock.RUnlock()
+	for _, h := range self.redirects {
+		if h == host {
+			return true
+		}
+	}
+	return false
 }
