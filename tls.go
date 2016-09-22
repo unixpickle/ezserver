@@ -38,7 +38,7 @@ func (c *TLSConfig) ToConfig() (*tls.Config, error) {
 	var err error
 	res := &tls.Config{}
 
-	res.NextProtos = []string{"http/1.1"}
+	res.NextProtos = []string{"http/1.1", "h2"}
 
 	// Generate the default certificate
 	res.Certificates = make([]tls.Certificate, 1)
