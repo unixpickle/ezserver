@@ -3,6 +3,9 @@ package ezserver
 import (
 	"crypto/tls"
 	"crypto/x509"
+
+	"golang.org/x/crypto/acme"
+	"golang.org/x/crypto/acme/autocert"
 )
 
 // KeyCert represents a TLS key/centificate pair.
@@ -16,6 +19,9 @@ type TLSConfig struct {
 	Named   map[string]KeyCert `json:"named"`
 	RootCAs []string           `json:"root_ca"`
 	Default KeyCert            `json:"default"`
+
+	ACMEDirectoryURL string   `json:"acme_dir_url"`
+	ACMEHosts        []string `json:"acme_hosts"`
 }
 
 // Clone produces a deep copy of a TLSConfig object.
@@ -30,7 +36,7 @@ func (c *TLSConfig) Clone() *TLSConfig {
 		roots[i] = x
 	}
 
-	return &TLSConfig{named, roots, c.Default}
+	return &TLSConfig{named, roots, c.Default, c.ACMEDirectoryURL, c.ACMEHosts}
 }
 
 // ToConfig turns a TLSConfig into a tls.Config.
@@ -70,6 +76,17 @@ func (c *TLSConfig) ToConfig() (*tls.Config, error) {
 			}
 		}
 		res.RootCAs = pool
+	}
+
+	if len(c.ACMEHosts) > 0 {
+		m := autocert.Manager{
+			Prompt:     autocert.AcceptTOS,
+			HostPolicy: autocert.HostWhitelist(c.ACMEHosts...),
+		}
+		if c.ACMEDirectoryURL != "" {
+			m.Client = &acme.Client{DirectoryURL: c.ACMEDirectoryURL}
+		}
+		res.GetCertificate = m.GetCertificate
 	}
 
 	return res, nil
