@@ -139,6 +139,7 @@ func (self *HTTP) serverLoop(listener *net.Listener, doneChan chan<- struct{},
 			} else {
 				newURL.Scheme = "http"
 			}
+			newURL.Host = r.Host
 			http.Redirect(w, r, newURL.String(), http.StatusTemporaryRedirect)
 			return
 		}
