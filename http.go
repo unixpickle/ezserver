@@ -8,6 +8,12 @@ import (
 	"time"
 )
 
+// An AutocertHandler is a function which handles certain
+// HTTP requests for ACME verification.
+//
+// It returns false if the request was not handled.
+type AutocertHandler func(w http.ResponseWriter, r *http.Request) bool
+
 // HTTP is an HTTP server instance which can listen on one port at a time.
 type HTTP struct {
 	mutex      sync.RWMutex
@@ -18,12 +24,15 @@ type HTTP struct {
 
 	redirectsLock sync.RWMutex
 	redirects     []string
+
+	autocertLock    sync.RWMutex
+	autocertHandler AutocertHandler
 }
 
 // NewHTTP creates a new HTTP server with a given handler.
 // The server will not be started.
 func NewHTTP(handler http.Handler) *HTTP {
-	return &HTTP{sync.RWMutex{}, handler, nil, 0, nil, sync.RWMutex{}, nil}
+	return &HTTP{handler: handler}
 }
 
 // IsRunning returns whether or not the server is accepting connections.
@@ -31,6 +40,25 @@ func (self *HTTP) IsRunning() bool {
 	self.mutex.RLock()
 	defer self.mutex.RUnlock()
 	return self.listener != nil
+}
+
+// AutocertHandler returns the current AutocertHandler.
+//
+// See SetAutocertHandler for more.
+func (self *HTTP) AutocertHandler() AutocertHandler {
+	self.autocertLock.RLock()
+	defer self.autocertLock.RUnlock()
+	return self.autocertHandler
+}
+
+// SetAutocertHandler sets the current AutocertHandler.
+//
+// This is set on HTTP handlers to allow them to pass
+// requests to an HTTPS handler.
+func (self *HTTP) SetAutocertHandler(h AutocertHandler) {
+	self.autocertLock.Lock()
+	defer self.autocertLock.Unlock()
+	self.autocertHandler = h
 }
 
 // SecurityRedirects returns the list of hosts that are
@@ -132,7 +160,10 @@ func (self *HTTP) Wait() error {
 func (self *HTTP) serverLoop(listener *net.Listener, doneChan chan<- struct{},
 	scheme string) {
 	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if self.shouldRedirect(r.Host) {
+		handler := self.AutocertHandler()
+		if handler != nil && handler(w, r) {
+			return
+		} else if self.shouldRedirect(r.Host) {
 			newURL := *r.URL
 			if scheme == "http" {
 				newURL.Scheme = "https"

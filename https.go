@@ -5,18 +5,24 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"sync"
+
+	"golang.org/x/crypto/acme/autocert"
 )
 
 // HTTPS is an HTTPS server instance which can listen on one port at a time.
 type HTTPS struct {
 	*HTTP
 	config *TLSConfig
+
+	managerLock sync.RWMutex
+	manager     *autocert.Manager
 }
 
 // NewHTTPS creates a new HTTPS server with a given handler.
 // The server will not be started.
 func NewHTTPS(handler http.Handler, config *TLSConfig) *HTTPS {
-	return &HTTPS{NewHTTP(handler), config.Clone()}
+	return &HTTPS{HTTP: NewHTTP(handler), config: config.Clone()}
 }
 
 // SetTLSConfig sets the TLSConfig on the server.
@@ -48,6 +54,26 @@ func (self *HTTPS) TLSConfig() *TLSConfig {
 	return self.config.Clone()
 }
 
+// HandleAutocertRequest handles HTTP requests to verify
+// with an ACME authority that we own a domain.
+// If the request is not a verification request, false is
+// returned and a downstream handler should be used.
+func (self *HTTPS) HandleAutocertRequest(w http.ResponseWriter, r *http.Request) bool {
+	self.managerLock.RLock()
+	manager := self.manager
+	self.managerLock.RUnlock()
+	if manager == nil {
+		return false
+	}
+
+	handled := true
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		handled = false
+	}
+	manager.HTTPHandler(http.HandlerFunc(handler)).ServeHTTP(w, r)
+	return handled
+}
+
 func (self *HTTPS) startInternal(port int) error {
 	if port <= 0 || port > 65535 {
 		return ErrInvalidPort
@@ -55,10 +81,19 @@ func (self *HTTPS) startInternal(port int) error {
 		return ErrAlreadyListening
 	}
 
-	config, err := self.config.ToConfig()
+	config, manager, err := self.config.ToConfig()
 	if err != nil {
 		return err
 	}
+
+	if manager != nil {
+		// Tip off the manager that we want to use the
+		// HTTP verification method.
+		manager.HTTPHandler(nil)
+	}
+	self.managerLock.Lock()
+	self.manager = manager
+	self.managerLock.Unlock()
 
 	// Create a new TCP listener
 	tcpListener, err := net.Listen("tcp", ":"+strconv.Itoa(port))

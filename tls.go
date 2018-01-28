@@ -40,7 +40,7 @@ func (c *TLSConfig) Clone() *TLSConfig {
 }
 
 // ToConfig turns a TLSConfig into a tls.Config.
-func (c *TLSConfig) ToConfig() (*tls.Config, error) {
+func (c *TLSConfig) ToConfig() (*tls.Config, *autocert.Manager, error) {
 	var err error
 	res := &tls.Config{}
 
@@ -51,7 +51,7 @@ func (c *TLSConfig) ToConfig() (*tls.Config, error) {
 	res.Certificates[0], err = tls.X509KeyPair([]byte(c.Default.Certificate),
 		[]byte(c.Default.Key))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Generate named certificates
@@ -60,7 +60,7 @@ func (c *TLSConfig) ToConfig() (*tls.Config, error) {
 		loaded, err := tls.X509KeyPair([]byte(pair.Certificate),
 			[]byte(pair.Key))
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		idx := len(res.Certificates)
 		res.Certificates = append(res.Certificates, loaded)
@@ -72,22 +72,23 @@ func (c *TLSConfig) ToConfig() (*tls.Config, error) {
 		pool := x509.NewCertPool()
 		for _, pemData := range c.RootCAs {
 			if !pool.AppendCertsFromPEM([]byte(pemData)) {
-				return nil, ErrInvalidRootCA
+				return nil, nil, ErrInvalidRootCA
 			}
 		}
 		res.RootCAs = pool
 	}
 
+	var manager *autocert.Manager
 	if len(c.ACMEHosts) > 0 {
-		m := autocert.Manager{
+		manager = &autocert.Manager{
 			Prompt:     autocert.AcceptTOS,
 			HostPolicy: autocert.HostWhitelist(c.ACMEHosts...),
 		}
 		if c.ACMEDirectoryURL != "" {
-			m.Client = &acme.Client{DirectoryURL: c.ACMEDirectoryURL}
+			manager.Client = &acme.Client{DirectoryURL: c.ACMEDirectoryURL}
 		}
-		res.GetCertificate = m.GetCertificate
+		res.GetCertificate = manager.GetCertificate
 	}
 
-	return res, nil
+	return res, manager, nil
 }
