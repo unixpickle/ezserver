@@ -105,14 +105,12 @@ func (self *HTTP) Start(port int) error {
 		return ErrAlreadyListening
 	}
 
-	// Create a new TCP listener
 	listener, err := net.Listen("tcp", ":"+strconv.Itoa(port))
 	if err != nil {
 		return err
 	}
 	self.listener = &listener
 
-	// Run the server in the background
 	self.loopDone = make(chan struct{})
 	go self.serverLoop(self.listener, self.loopDone, "http")
 
@@ -142,17 +140,14 @@ func (self *HTTP) Stop() error {
 func (self *HTTP) Wait() error {
 	self.mutex.RLock()
 
-	// If not listening, return an error
 	if self.listener == nil {
 		self.mutex.RUnlock()
 		return ErrNotListening
 	}
 
-	// Get the channel and unlock the server
 	ch := self.loopDone
 	self.mutex.RUnlock()
 
-	// Wait for the background loop to end
 	<-ch
 	return nil
 }
@@ -193,16 +188,13 @@ func (self *HTTP) serverLoop(listener *net.Listener, doneChan chan<- struct{},
 }
 
 func (self *HTTP) stopInternal() error {
-	// If not listening, return an error
 	if self.listener == nil {
 		return ErrNotListening
 	}
 
-	// Close the listener and nil it out
 	(*self.listener).Close()
 	self.listener = nil
 
-	// Wait until the background thread's loop ends
 	<-self.loopDone
 	self.loopDone = nil
 	return nil

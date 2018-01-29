@@ -95,7 +95,6 @@ func (self *HTTPS) startInternal(port int) error {
 	self.manager = manager
 	self.managerLock.Unlock()
 
-	// Create a new TCP listener
 	tcpListener, err := net.Listen("tcp", ":"+strconv.Itoa(port))
 	if err != nil {
 		return err
@@ -103,7 +102,6 @@ func (self *HTTPS) startInternal(port int) error {
 	listener := tls.NewListener(tcpListener, config)
 	self.listener = &listener
 
-	// Run the server in the background
 	self.loopDone = make(chan struct{})
 	go self.serverLoop(self.listener, self.loopDone, "https")
 

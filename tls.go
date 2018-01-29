@@ -46,7 +46,6 @@ func (c *TLSConfig) ToConfig() (*tls.Config, *autocert.Manager, error) {
 
 	res.NextProtos = []string{"http/1.1", "h2"}
 
-	// Generate the default certificate
 	res.Certificates = make([]tls.Certificate, 1)
 	res.Certificates[0], err = tls.X509KeyPair([]byte(c.Default.Certificate),
 		[]byte(c.Default.Key))
@@ -54,7 +53,6 @@ func (c *TLSConfig) ToConfig() (*tls.Config, *autocert.Manager, error) {
 		return nil, nil, err
 	}
 
-	// Generate named certificates
 	res.NameToCertificate = map[string]*tls.Certificate{}
 	for name, pair := range c.Named {
 		loaded, err := tls.X509KeyPair([]byte(pair.Certificate),
@@ -67,7 +65,6 @@ func (c *TLSConfig) ToConfig() (*tls.Config, *autocert.Manager, error) {
 		res.NameToCertificate[name] = &res.Certificates[idx]
 	}
 
-	// Generate the RootCAs CertPool
 	if len(c.RootCAs) > 0 {
 		pool := x509.NewCertPool()
 		for _, pemData := range c.RootCAs {
