@@ -36,29 +36,29 @@ func NewHTTP(handler http.Handler) *HTTP {
 }
 
 // IsRunning returns whether or not the server is accepting connections.
-func (self *HTTP) IsRunning() bool {
-	self.mutex.RLock()
-	defer self.mutex.RUnlock()
-	return self.listener != nil
+func (h *HTTP) IsRunning() bool {
+	h.mutex.RLock()
+	defer h.mutex.RUnlock()
+	return h.listener != nil
 }
 
 // AutocertHandler returns the current AutocertHandler.
 //
 // See SetAutocertHandler for more.
-func (self *HTTP) AutocertHandler() AutocertHandler {
-	self.autocertLock.RLock()
-	defer self.autocertLock.RUnlock()
-	return self.autocertHandler
+func (h *HTTP) AutocertHandler() AutocertHandler {
+	h.autocertLock.RLock()
+	defer h.autocertLock.RUnlock()
+	return h.autocertHandler
 }
 
 // SetAutocertHandler sets the current AutocertHandler.
 //
 // This is set on HTTP handlers to allow them to pass
 // requests to an HTTPS handler.
-func (self *HTTP) SetAutocertHandler(h AutocertHandler) {
-	self.autocertLock.Lock()
-	defer self.autocertLock.Unlock()
-	self.autocertHandler = h
+func (h *HTTP) SetAutocertHandler(handler AutocertHandler) {
+	h.autocertLock.Lock()
+	defer h.autocertLock.Unlock()
+	h.autocertHandler = handler
 }
 
 // SecurityRedirects returns the list of hosts that are
@@ -69,11 +69,11 @@ func (self *HTTP) SetAutocertHandler(h AutocertHandler) {
 // The returned slice is a copy of the original, so the
 // caller may modify it without changing the redirects
 // used by the server.
-func (self *HTTP) SecurityRedirects() []string {
-	self.redirectsLock.RLock()
-	defer self.redirectsLock.RUnlock()
-	res := make([]string, len(self.redirects))
-	copy(res, self.redirects)
+func (h *HTTP) SecurityRedirects() []string {
+	h.redirectsLock.RLock()
+	defer h.redirectsLock.RUnlock()
+	res := make([]string, len(h.redirects))
+	copy(res, h.redirects)
 	return res
 }
 
@@ -85,23 +85,23 @@ func (self *HTTP) SecurityRedirects() []string {
 // redirects used by the server.
 //
 // See SecurityRedirects for more.
-func (self *HTTP) SetSecurityRedirects(r []string) {
-	self.redirectsLock.Lock()
-	defer self.redirectsLock.Unlock()
-	self.redirects = make([]string, len(r))
-	copy(self.redirects, r)
+func (h *HTTP) SetSecurityRedirects(r []string) {
+	h.redirectsLock.Lock()
+	defer h.redirectsLock.Unlock()
+	h.redirects = make([]string, len(r))
+	copy(h.redirects, r)
 }
 
 // Start runs the HTTP server on a given port.
-func (self *HTTP) Start(port int) error {
+func (h *HTTP) Start(port int) error {
 	if port <= 0 || port > 65535 {
 		return ErrInvalidPort
 	}
 
-	self.mutex.Lock()
-	defer self.mutex.Unlock()
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
 
-	if self.listener != nil {
+	if h.listener != nil {
 		return ErrAlreadyListening
 	}
 
@@ -109,56 +109,56 @@ func (self *HTTP) Start(port int) error {
 	if err != nil {
 		return err
 	}
-	self.listener = &listener
+	h.listener = &listener
 
-	self.loopDone = make(chan struct{})
-	go self.serverLoop(self.listener, self.loopDone, "http")
+	h.loopDone = make(chan struct{})
+	go h.serverLoop(h.listener, h.loopDone, "http")
 
-	self.listenPort = port
+	h.listenPort = port
 
 	return nil
 }
 
 // Status returns whether or not the server is running and the port on which it
 // is listening (if applicable).
-func (self *HTTP) Status() (bool, int) {
-	self.mutex.RLock()
-	defer self.mutex.RUnlock()
-	return self.listener != nil, self.listenPort
+func (h *HTTP) Status() (bool, int) {
+	h.mutex.RLock()
+	defer h.mutex.RUnlock()
+	return h.listener != nil, h.listenPort
 }
 
 // Stop stops the HTTP server.
 // This method will only return once the running HTTP server has stopped
 // accepting connections.
-func (self *HTTP) Stop() error {
-	self.mutex.Lock()
-	defer self.mutex.Unlock()
-	return self.stopInternal()
+func (h *HTTP) Stop() error {
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+	return h.stopInternal()
 }
 
 // Wait waits for the HTTP server to stop and then returns.
-func (self *HTTP) Wait() error {
-	self.mutex.RLock()
+func (h *HTTP) Wait() error {
+	h.mutex.RLock()
 
-	if self.listener == nil {
-		self.mutex.RUnlock()
+	if h.listener == nil {
+		h.mutex.RUnlock()
 		return ErrNotListening
 	}
 
-	ch := self.loopDone
-	self.mutex.RUnlock()
+	ch := h.loopDone
+	h.mutex.RUnlock()
 
 	<-ch
 	return nil
 }
 
-func (self *HTTP) serverLoop(listener *net.Listener, doneChan chan<- struct{},
+func (h *HTTP) serverLoop(listener *net.Listener, doneChan chan<- struct{},
 	scheme string) {
-	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		handler := self.AutocertHandler()
+	mainHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handler := h.AutocertHandler()
 		if handler != nil && handler(w, r) {
 			return
-		} else if self.shouldRedirect(r.Host) {
+		} else if h.shouldRedirect(r.Host) {
 			newURL := *r.URL
 			if scheme == "http" {
 				newURL.Scheme = "https"
@@ -170,40 +170,40 @@ func (self *HTTP) serverLoop(listener *net.Listener, doneChan chan<- struct{},
 			return
 		}
 		r.URL.Scheme = scheme
-		self.handler.ServeHTTP(w, r)
+		h.handler.ServeHTTP(w, r)
 	})
 
 	var server http.Server
-	server.Handler = h
+	server.Handler = mainHandler
 	server.ReadTimeout = time.Hour
 	server.Serve(*listener)
 
 	close(doneChan)
-	self.mutex.Lock()
-	if self.listener == listener {
-		self.listener = nil
-		self.loopDone = nil
+	h.mutex.Lock()
+	if h.listener == listener {
+		h.listener = nil
+		h.loopDone = nil
 	}
-	self.mutex.Unlock()
+	h.mutex.Unlock()
 }
 
-func (self *HTTP) stopInternal() error {
-	if self.listener == nil {
+func (h *HTTP) stopInternal() error {
+	if h.listener == nil {
 		return ErrNotListening
 	}
 
-	(*self.listener).Close()
-	self.listener = nil
+	(*h.listener).Close()
+	h.listener = nil
 
-	<-self.loopDone
-	self.loopDone = nil
+	<-h.loopDone
+	h.loopDone = nil
 	return nil
 }
 
-func (self *HTTP) shouldRedirect(host string) bool {
-	self.redirectsLock.RLock()
-	defer self.redirectsLock.RUnlock()
-	for _, h := range self.redirects {
+func (h *HTTP) shouldRedirect(host string) bool {
+	h.redirectsLock.RLock()
+	defer h.redirectsLock.RUnlock()
+	for _, h := range h.redirects {
 		if h == host {
 			return true
 		}

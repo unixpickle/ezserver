@@ -27,41 +27,41 @@ func NewHTTPS(handler http.Handler, config *TLSConfig) *HTTPS {
 
 // SetTLSConfig sets the TLSConfig on the server.
 // This may stop and restart the server.
-func (self *HTTPS) SetTLSConfig(c *TLSConfig) error {
-	self.mutex.Lock()
-	defer self.mutex.Unlock()
-	self.config = c.Clone()
-	if self.listener == nil {
+func (h *HTTPS) SetTLSConfig(c *TLSConfig) error {
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+	h.config = c.Clone()
+	if h.listener == nil {
 		return nil
 	}
-	if err := self.stopInternal(); err != nil {
+	if err := h.stopInternal(); err != nil {
 		return err
 	}
-	return self.startInternal(self.listenPort)
+	return h.startInternal(h.listenPort)
 }
 
 // Start runs the HTTP server on a given port.
-func (self *HTTPS) Start(port int) error {
-	self.mutex.Lock()
-	defer self.mutex.Unlock()
-	return self.startInternal(port)
+func (h *HTTPS) Start(port int) error {
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+	return h.startInternal(port)
 }
 
 // TLSConfig returns the TLSConfig for the server.
-func (self *HTTPS) TLSConfig() *TLSConfig {
-	self.mutex.RLock()
-	defer self.mutex.RUnlock()
-	return self.config.Clone()
+func (h *HTTPS) TLSConfig() *TLSConfig {
+	h.mutex.RLock()
+	defer h.mutex.RUnlock()
+	return h.config.Clone()
 }
 
 // HandleAutocertRequest handles HTTP requests to verify
 // with an ACME authority that we own a domain.
 // If the request is not a verification request, false is
 // returned and a downstream handler should be used.
-func (self *HTTPS) HandleAutocertRequest(w http.ResponseWriter, r *http.Request) bool {
-	self.managerLock.RLock()
-	manager := self.manager
-	self.managerLock.RUnlock()
+func (h *HTTPS) HandleAutocertRequest(w http.ResponseWriter, r *http.Request) bool {
+	h.managerLock.RLock()
+	manager := h.manager
+	h.managerLock.RUnlock()
 	if manager == nil {
 		return false
 	}
@@ -74,14 +74,14 @@ func (self *HTTPS) HandleAutocertRequest(w http.ResponseWriter, r *http.Request)
 	return handled
 }
 
-func (self *HTTPS) startInternal(port int) error {
+func (h *HTTPS) startInternal(port int) error {
 	if port <= 0 || port > 65535 {
 		return ErrInvalidPort
-	} else if self.listener != nil {
+	} else if h.listener != nil {
 		return ErrAlreadyListening
 	}
 
-	config, manager, err := self.config.ToConfig()
+	config, manager, err := h.config.ToConfig()
 	if err != nil {
 		return err
 	}
@@ -91,21 +91,21 @@ func (self *HTTPS) startInternal(port int) error {
 		// HTTP verification method.
 		manager.HTTPHandler(nil)
 	}
-	self.managerLock.Lock()
-	self.manager = manager
-	self.managerLock.Unlock()
+	h.managerLock.Lock()
+	h.manager = manager
+	h.managerLock.Unlock()
 
 	tcpListener, err := net.Listen("tcp", ":"+strconv.Itoa(port))
 	if err != nil {
 		return err
 	}
 	listener := tls.NewListener(tcpListener, config)
-	self.listener = &listener
+	h.listener = &listener
 
-	self.loopDone = make(chan struct{})
-	go self.serverLoop(self.listener, self.loopDone, "https")
+	h.loopDone = make(chan struct{})
+	go h.serverLoop(h.listener, h.loopDone, "https")
 
-	self.listenPort = port
+	h.listenPort = port
 
 	return nil
 }
