@@ -43,7 +43,7 @@ func (c *TLSConfig) ToConfig() (*tls.Config, *autocert.Manager, error) {
 	var err error
 	res := &tls.Config{}
 
-	res.NextProtos = []string{"http/1.1", "h2"}
+	res.NextProtos = []string{"http/1.1", "h2", acme.ALPNProto}
 
 	res.Certificates = make([]tls.Certificate, 1)
 	res.Certificates[0], err = tls.X509KeyPair([]byte(c.Default.Certificate),
