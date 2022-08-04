@@ -22,6 +22,7 @@ type TLSConfig struct {
 
 	ACMEDirectoryURL string   `json:"acme_dir_url"`
 	ACMEHosts        []string `json:"acme_hosts"`
+	ACMECacheDir     string   `json:"acme_cache_dir"`
 }
 
 // Clone produces a deep copy of a TLSConfig object.
@@ -31,12 +32,10 @@ func (c *TLSConfig) Clone() *TLSConfig {
 		named[key] = val
 	}
 
-	roots := make([]string, len(c.RootCAs))
-	for i, x := range c.RootCAs {
-		roots[i] = x
-	}
+	roots := append([]string{}, c.RootCAs...)
+	acmeHosts := append([]string{}, c.ACMEHosts...)
 
-	return &TLSConfig{named, roots, c.Default, c.ACMEDirectoryURL, c.ACMEHosts}
+	return &TLSConfig{named, roots, c.Default, c.ACMEDirectoryURL, acmeHosts, c.ACMECacheDir}
 }
 
 // ToConfig turns a TLSConfig into a tls.Config.
@@ -83,6 +82,9 @@ func (c *TLSConfig) ToConfig() (*tls.Config, *autocert.Manager, error) {
 		}
 		if c.ACMEDirectoryURL != "" {
 			manager.Client = &acme.Client{DirectoryURL: c.ACMEDirectoryURL}
+		}
+		if c.ACMECacheDir != "" {
+			manager.Cache = autocert.DirCache(c.ACMECacheDir)
 		}
 		res.GetCertificate = manager.GetCertificate
 	}
