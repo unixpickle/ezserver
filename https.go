@@ -75,6 +75,7 @@ func (h *HTTPS) HandleAutocertRequest(w http.ResponseWriter, r *http.Request) bo
 	manager.HTTPHandler(http.HandlerFunc(handler)).ServeHTTP(w, r)
 	if handled {
 		log.Printf("handling autocert request succeeded %s %s", w.Header, r.RemoteAddr)
+	}
 	return handled
 }
 
