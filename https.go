@@ -59,6 +59,7 @@ func (h *HTTPS) TLSConfig() *TLSConfig {
 // If the request is not a verification request, false is
 // returned and a downstream handler should be used.
 func (h *HTTPS) HandleAutocertRequest(w http.ResponseWriter, r *http.Request) bool {
+	log.Printf("handling autocert request %s %s", w.Header, r.RemoteAddr)
 	h.managerLock.RLock()
 	manager := h.manager
 	h.managerLock.RUnlock()
@@ -68,9 +69,12 @@ func (h *HTTPS) HandleAutocertRequest(w http.ResponseWriter, r *http.Request) bo
 
 	handled := true
 	handler := func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("handling autocert request failed %s %s", w.Header, r.RemoteAddr)
 		handled = false
 	}
 	manager.HTTPHandler(http.HandlerFunc(handler)).ServeHTTP(w, r)
+	if handled {
+		log.Printf("handling autocert request succeeded %s %s", w.Header, r.RemoteAddr)
 	return handled
 }
 
