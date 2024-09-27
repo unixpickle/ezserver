@@ -2,6 +2,7 @@ package ezserver
 
 import (
 	"crypto/tls"
+	"log"
 	"net"
 	"net/http"
 	"strconv"
